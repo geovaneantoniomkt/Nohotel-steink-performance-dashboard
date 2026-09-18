@@ -1,17 +1,22 @@
 # Configuração do dashboard — Nohotel
 
 ```
-GitHub Actions (todo dia 07:00 BRT)                  Cloudflare Pages
-┌────────────────────────────────┐  wrangler deploy  ┌──────────────────────────────┐
-│ scripts/fetch_meta.py          │ ────────────────► │ functions/_middleware.js     │ ← senha + cabeçalhos
-│   META_ACCESS_TOKEN (secret)   │  public/ + data/  │ public/index.html, app.js    │
-│   → public/data/meta.json      │  (nunca vai p/ git)│ public/data/*.json          │ ← só com sessão válida
-│   → public/data/organic.json   │                   └──────────────────────────────┘
+GitHub Actions (todo dia 07:00 BRT)                        Netlify
+┌────────────────────────────────┐  netlify deploy   ┌──────────────────────────────────┐
+│ scripts/fetch_meta.py          │ ────────────────► │ netlify/edge-functions/auth.js   │ ← senha + cabeçalhos
+│   META_ACCESS_TOKEN (secret)   │  public/ + data/  │ public/index.html, app.js        │
+│   → public/data/meta.json      │ (nunca vai p/ git)│ public/data/*.json               │ ← só com sessão válida
+│   → public/data/organic.json   │                   └──────────────────────────────────┘
 │ scripts/fetch_google.py        │
 │   GOOGLE_ADS_* (secrets)       │
 │   → public/data/google.json    │
 └────────────────────────────────┘
 ```
+
+**Por que o deploy não sai do próprio Netlify conectado ao Git:** os dados não estão no repositório.
+Eles são gerados na hora pelos coletores e enviados junto com o site. Por isso quem publica é o
+GitHub Actions, usando a CLI do Netlify. Não conecte o site ao repositório pela interface do Netlify
+— se fizer isso, ele vai publicar o site sem a pasta `data/` e o dashboard aparece vazio.
 
 Princípios de segurança:
 
@@ -19,7 +24,8 @@ Princípios de segurança:
   token nenhum e o navegador nunca fala com a API do Meta ou do Google.
 - **Os dados nunca entram no git.** `public/data/` está no `.gitignore` — importante porque o
   repositório é público.
-- **Tudo atrás de senha**, inclusive os JSONs: o middleware roda antes de qualquer arquivo estático.
+- **Tudo atrás de senha**, inclusive os JSONs: a Edge Function intercepta todas as rotas antes de
+  qualquer arquivo estático.
 - Sessão em cookie assinado (HMAC-SHA256), `HttpOnly`, `Secure`, `SameSite=Strict`, expira em 12 h.
 - Comparação de senha em tempo constante, bloqueio de 15 min após 5 erros por IP, proteção CSRF
   (`Sec-Fetch-Site`/`Origin`), sem *open redirect* no `next`.
@@ -29,34 +35,64 @@ Princípios de segurança:
 
 ---
 
-## 1. Segredos do GitHub
+## 1. Criar o site no Netlify
+
+1. Entrar no Netlify → **Add new site → Deploy manually** e arrastar a pasta `public/` (qualquer
+   conteúdo serve; é só para o site existir e ganhar um ID). **Não** use "Import from Git".
+2. Renomear o site em **Site configuration → Site details → Change site name** para
+   `nohotel-dashboard` (a URL fica `https://nohotel-dashboard.netlify.app`).
+3. Copiar o **Site ID** em *Site configuration → Site details → Site information*.
+
+## 2. Senha do dashboard (variáveis de ambiente do Netlify)
+
+Em **Site configuration → Environment variables → Add a variable**, escopo *All scopes* /
+*All deploy contexts*:
+
+| Variável | Valor |
+|---|---|
+| `DASHBOARD_PASSWORD` | a senha que a equipe vai digitar (use 16+ caracteres) |
+| `SESSION_SECRET` | string aleatória longa — assina o cookie de sessão |
+| `SESSION_HOURS` | opcional, duração da sessão em horas (padrão 12) |
+
+Para gerar um `SESSION_SECRET`:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Trocar o `SESSION_SECRET` derruba todas as sessões abertas. Trocar a senha vale no deploy seguinte
+(as variáveis são lidas a cada requisição, então o efeito é praticamente imediato).
+
+> Sem essas duas variáveis a Edge Function devolve **503** em tudo, de propósito: é melhor o site sair
+> do ar do que ficar aberto sem senha.
+
+## 3. Segredos do GitHub
 
 Em **Settings → Secrets and variables → Actions → New repository secret**:
 
 | Nome | O que é |
 |---|---|
-| `META_ADS_TOKEN` (ou `META_ACCESS_TOKEN`) | Token de usuário do sistema do Business Nohotel (`647998705890215`) |
-| `CLOUDFLARE_API_TOKEN` | Token da API do Cloudflare com permissão **Cloudflare Pages: Edit** |
-| `CLOUDFLARE_ACCOUNT_ID` | ID da conta Cloudflare (barra lateral do painel) |
-| `GOOGLE_ADS_DEVELOPER_TOKEN` | Token de desenvolvedor do MCC |
-| `GOOGLE_ADS_CLIENT_ID` | Client ID do OAuth (Google Cloud → Credenciais) |
-| `GOOGLE_ADS_CLIENT_SECRET` | Client secret do OAuth |
-| `GOOGLE_ADS_REFRESH_TOKEN` | Gerado por `python scripts/google_oauth.py` |
+| `NETLIFY_AUTH_TOKEN` | Netlify → foto do perfil → **User settings → Applications → Personal access tokens → New access token** |
+| `NETLIFY_SITE_ID` | o Site ID copiado no passo 1 |
+| `META_ADS_TOKEN` | token de usuário do sistema do Business Nohotel (`647998705890215`) |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | token de desenvolvedor do MCC |
+| `GOOGLE_ADS_CLIENT_ID` | client ID do OAuth (Google Cloud → Credenciais) |
+| `GOOGLE_ADS_CLIENT_SECRET` | client secret do OAuth |
+| `GOOGLE_ADS_REFRESH_TOKEN` | gerado por `python scripts/google_oauth.py` |
 | `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | ID da conta administradora (MCC), só dígitos — opcional, o coletor descobre sozinho |
 
-Variáveis opcionais (aba *Variables*): `CF_PAGES_PROJECT` (padrão `nohotel-dashboard`),
-`META_API_VERSION` (padrão `v23.0`), `GOOGLE_ADS_CUSTOMER_ID` (padrão `781-346-4105`),
-`META_SINCE` / `GOOGLE_SINCE` (padrão `2025-04-01`).
+Variáveis opcionais (aba *Variables*): `META_API_VERSION` (padrão `v23.0`),
+`GOOGLE_ADS_CUSTOMER_ID` (padrão `781-346-4105`), `META_SINCE` / `GOOGLE_SINCE` (padrão `2025-04-01`).
 
 O workflow é `.github/workflows/update-dashboard.yml`. Ele roda todo dia às **10:00 UTC (07:00
 Brasília)**, manualmente em **Actions → Atualizar dashboard → Run workflow**, e a cada push na `main`
-que altere `public/`, `functions/` ou `scripts/`.
+que altere `public/`, `netlify/` ou `scripts/`.
 
 Se o Google Ads ainda não estiver configurado, o passo dele falha de forma controlada
 (`continue-on-error`), grava `google.json` com `configured: false` e o dashboard mostra o passo a
-passo de integração no lugar dos dados. O resto do dashboard continua funcionando normalmente.
+passo de integração no lugar dos dados. O resto continua funcionando.
 
-## 2. Token do Meta
+## 4. Token do Meta
 
 Usuário do Sistema no Business Manager da Nohotel (`647998705890215`), com acesso à conta de
 anúncios, à Página e ao Instagram, e token sem expiração com os escopos:
@@ -67,7 +103,7 @@ anúncios, à Página e ao Instagram, e token sem expiração com os escopos:
 Sem os escopos de Página/Instagram o coletor continua funcionando para o Meta Ads e registra o motivo
 em "Avisos da última coleta" dentro do dashboard.
 
-## 3. Google Ads
+## 5. Google Ads
 
 1. **MCC**: vincular a conta `781-346-4105` ao MCC da Steink e pegar o **token de desenvolvedor**
    em Ferramentas → Configuração da API.
@@ -90,28 +126,18 @@ Na conta do Google Ads, marcar como **conversão principal** só o que é reserv
 o custo por conversão do dashboard usa `conversions` (principais) e mostra `all_conversions` como
 referência.
 
-## 4. Cloudflare Pages
+## 6. Camadas extras recomendadas
 
-1. Painel Cloudflare → **Workers & Pages → Create → Pages → Upload assets**.
-   Nome do projeto: `nohotel-dashboard`. Pode subir qualquer arquivo só para criar o projeto — o
-   Actions substitui no primeiro deploy.
-2. **Settings → Environment variables → Production**, adicionar como **Secret**:
-   - `DASHBOARD_PASSWORD` — a senha de acesso (16+ caracteres).
-   - `SESSION_SECRET` — string aleatória longa. Trocar essa chave derruba todas as sessões.
-   - `SESSION_HOURS` (opcional) — duração da sessão em horas (padrão 12).
-3. Criar o token da API em **My Profile → API Tokens → Create Token → "Edit Cloudflare Workers"**
-   e guardar em `CLOUDFLARE_API_TOKEN` no GitHub.
-4. Rodar o workflow. A URL fica em `https://nohotel-dashboard.pages.dev`.
-
-### Camadas extras recomendadas (gratuitas)
-
-- **Rate limit no WAF**: Security → WAF → Rate limiting rules → `URI Path equals /login` e método
-  `POST`, máx. 10 requisições / 1 min por IP → *Block*.
-- **Cloudflare Access (Zero Trust)** como segunda camada: cada pessoa entra com o próprio e-mail
-  (OTP) e o acesso pode ser revogado individualmente.
+- **Domínio próprio**: Netlify → Domain management → Add domain (ex. `dash.nohotel.com.br`). O HTTPS
+  é automático.
+- **Netlify Identity / SSO** (opcional, pago nos planos maiores): permite login por e-mail individual
+  em vez de senha compartilhada, com revogação por pessoa.
 - Trocar `DASHBOARD_PASSWORD` sempre que alguém sair do projeto.
+- O bloqueio por tentativas é por *isolate* da edge — é uma primeira barreira, não um rate limiter
+  global. Para força bruta séria, combine com um domínio atrás de Cloudflare ou com o Netlify
+  Firewall Traffic Rules.
 
-## 5. Rodar localmente
+## 7. Rodar localmente
 
 ```bash
 # 1) coletar (o .env.google é lido automaticamente pelo fetch_google.py)
@@ -119,22 +145,32 @@ set META_ACCESS_TOKEN=EAAB...      # PowerShell: $env:META_ACCESS_TOKEN="EAAB...
 python scripts/fetch_meta.py
 python scripts/fetch_google.py
 
-# 2) subir o site com a camada de senha (.dev.vars, fora do git)
+# 2) subir o site com a mesma camada de senha da produção
 npm run dev                        # http://localhost:8790
 ```
 
-`.dev.vars` precisa de `DASHBOARD_PASSWORD` e `SESSION_SECRET` (mínimo 16 caracteres).
+`netlify dev` lê a senha do arquivo `.env` na raiz (`DASHBOARD_PASSWORD`, `SESSION_SECRET`), que está
+no `.gitignore`.
 
-## 6. Arquivos locais que nunca vão para o git
+## 8. Arquivos locais que nunca vão para o git
 
 | Arquivo | Conteúdo |
 |---|---|
-| `.dev.vars` | senha e chave de sessão do ambiente local |
+| `.env` | senha e chave de sessão usadas pelo `netlify dev` |
+| `.dev.vars` | mesmas variáveis, para o `wrangler` (Cloudflare) |
 | `.env.google` | credenciais da Google Ads API |
 | `SENHA-LOCAL.txt` | lembrete da senha local de teste |
 | `public/data/*.json` | dados coletados |
 
-## 7. Checklist de segurança executado
+## 9. Alternativa: Cloudflare Pages
+
+O repositório também traz a mesma proteção em `functions/_middleware.js` (formato Cloudflare Pages
+Functions) e o `wrangler.toml`. O workflow só usa o Cloudflare se os segredos do Netlify não
+existirem. Para usar esse caminho, cadastre `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` no
+GitHub e as variáveis `DASHBOARD_PASSWORD` / `SESSION_SECRET` no painel do Cloudflare Pages. Os
+comandos locais ficam em `npm run dev:cloudflare` e `npm run deploy:cloudflare`.
+
+## 10. Checklist de segurança executado
 
 - [x] `/data/*.json` sem sessão → 401; `/` sem sessão → redireciona para `/login`
 - [x] Senha errada → 401 com atraso; 5 erros → bloqueio de 15 min por IP
@@ -143,4 +179,5 @@ npm run dev                        # http://localhost:8790
 - [x] Cookie `HttpOnly; Secure; SameSite=Strict`, assinado
 - [x] CSP sem `unsafe-inline`; nenhum script/CSS externo; imagens só via `https:`
 - [x] Tokens nunca aparecem em log (URLs e mensagens de erro são higienizadas nos dois coletores)
-- [x] Dados, `.dev.vars` e `.env.google` no `.gitignore`
+- [x] Dados, `.env`, `.dev.vars` e `.env.google` no `.gitignore`
+- [x] Sem as variáveis de senha, a Edge Function devolve 503 em vez de servir o site aberto

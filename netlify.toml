@@ -1,0 +1,23 @@
+# Deploy no Netlify.
+#
+# O site é estático (public/) e a senha roda numa Edge Function (netlify/edge-functions/auth.js),
+# que intercepta TODAS as rotas — inclusive os JSONs em /data/.
+#
+# Os dados NÃO estão no git: o GitHub Actions roda os coletores e faz o deploy com a CLI do Netlify,
+# levando public/ já preenchido. Por isso o site não deve ser buildado pelo Netlify a partir do repo.
+
+[build]
+  publish = "public"
+  command = ""
+
+# A pasta functions/ da raiz é do Cloudflare Pages (formato Workers) e não pode ser lida como
+# Netlify Function. Apontar explicitamente evita que o Netlify tente empacotá-la.
+[functions]
+  directory = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# A rota da Edge Function está declarada no próprio arquivo (export const config).
+# Variáveis obrigatórias em Site configuration > Environment variables:
+#   DASHBOARD_PASSWORD, SESSION_SECRET  (e SESSION_HOURS, opcional)

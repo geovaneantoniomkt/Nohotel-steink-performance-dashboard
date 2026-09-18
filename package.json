@@ -7,10 +7,14 @@
     "fetch": "python scripts/fetch_meta.py && python scripts/fetch_google.py",
     "fetch:meta": "python scripts/fetch_meta.py",
     "fetch:google": "python scripts/fetch_google.py",
-    "dev": "wrangler pages dev public --compatibility-date=2026-09-01 --port 8790",
-    "deploy": "wrangler pages deploy public --project-name nohotel-dashboard --branch main --commit-dirty=true"
+    "oauth:google": "python scripts/google_oauth.py",
+    "dev": "netlify dev --dir public --port 8790",
+    "deploy": "netlify deploy --prod --dir public",
+    "dev:cloudflare": "wrangler pages dev public --compatibility-date=2026-09-01 --port 8790",
+    "deploy:cloudflare": "wrangler pages deploy public --project-name nohotel-dashboard --branch main --commit-dirty=true"
   },
   "devDependencies": {
+    "netlify-cli": "^23.0.0",
     "wrangler": "^4.0.0"
   }
 }

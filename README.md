@@ -1,7 +1,7 @@
 # Nohotel × Steink Performance — Dashboard de performance
 
 Dashboard protegido por senha com os dados de **Meta Ads**, **Google Ads** e **orgânico** (Instagram +
-Facebook) da Nohotel. Atualiza sozinho todo dia às 7h da manhã e publica no Cloudflare Pages.
+Facebook) da Nohotel. Atualiza sozinho todo dia às 7h da manhã e publica no **Netlify**.
 
 | Item | Valor |
 |---|---|
@@ -22,6 +22,13 @@ Facebook) da Nohotel. Atualiza sozinho todo dia às 7h da manhã e publica no Cl
 | Criativos | Cards por anúncio com miniatura, gasto, resultados, custo, CTR, CPM e link para o anúncio publicado |
 | Orgânico | Instagram (seguidores, alcance, visitas ao perfil, contas engajadas, publicações) e Facebook (seguidores, engajamento, visitas à página) |
 | Legendas | O que significa cada métrica, status e regra de qualidade |
+
+## Acesso
+
+O site inteiro fica atrás de senha, inclusive os arquivos de dados. Quem cuida disso é uma **Edge
+Function do Netlify** (`netlify/edge-functions/auth.js`): ela intercepta todas as rotas, mostra a tela
+de login e só deixa passar quem tem um cookie de sessão assinado. A senha fica na variável de
+ambiente `DASHBOARD_PASSWORD` do Netlify — não existe nenhuma senha dentro do código.
 
 ## O que conta como resultado
 
@@ -45,12 +52,13 @@ salvas só no navegador de quem editou) e o padrão fica em `public/config.json`
 ## Estrutura
 
 ```
-public/            site estático (index.html, app.js, styles.css, config.json, logo.jpg)
-public/data/       JSONs gerados pelos coletores — ignorados pelo git
-functions/         _middleware.js (senha, sessão, cabeçalhos de segurança)
-scripts/           fetch_meta.py, fetch_google.py (coletores) e google_oauth.py (gera o refresh token)
-.github/workflows/ update-dashboard.yml (coleta + deploy diário)
-wrangler.toml      configuração do Cloudflare Pages
+public/                    site estático (index.html, app.js, styles.css, config.json, logo.jpg)
+public/data/               JSONs gerados pelos coletores — ignorados pelo git
+netlify/edge-functions/    auth.js — senha, sessão e cabeçalhos de segurança
+netlify.toml               configuração do Netlify
+scripts/                   fetch_meta.py, fetch_google.py e google_oauth.py
+.github/workflows/         update-dashboard.yml (coleta + deploy diário)
+functions/, wrangler.toml  mesma proteção em formato Cloudflare Pages (caminho alternativo)
 ```
 
 Configuração completa, segredos e checklist de segurança em [`DASHBOARD.md`](DASHBOARD.md).
@@ -64,4 +72,4 @@ npm run dev                      # http://localhost:8790
 ```
 
 > Este repositório é público. Nenhum token, senha ou dado do cliente entra no git: os JSONs de dados
-> são gerados na hora do deploy e enviados direto para o Cloudflare.
+> são gerados na hora do deploy e enviados direto para o Netlify.
