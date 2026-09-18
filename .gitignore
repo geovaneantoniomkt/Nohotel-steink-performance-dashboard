@@ -27,3 +27,7 @@ SENHA-LOCAL.txt
 
 # Pacote gerado para o deploy manual no Netlify
 deploy-netlify/
+
+# Lista local de segredos para copiar no GitHub
+SEGREDOS-GITHUB.txt
+.env.meta
