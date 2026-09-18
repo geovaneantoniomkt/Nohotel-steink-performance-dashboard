@@ -102,6 +102,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true", help="só mostra o link, não abre o navegador")
+    ap.add_argument("--redirect-uri", default=None, help="usar um redirect já cadastrado no cliente (ex.: https://developers.google.com/oauthplayground)")
+    ap.add_argument("--code", default=None, help="trocar um código de autorização já obtido pelo refresh token (pode colar a URL inteira)")
     args = ap.parse_args()
 
     env = load_env()
@@ -110,8 +112,29 @@ def main() -> int:
         print("ERRO: defina GOOGLE_ADS_CLIENT_ID e GOOGLE_ADS_CLIENT_SECRET em .env.google")
         return 2
 
-    redirect = f"http://localhost:{args.port}/"
+    redirect = args.redirect_uri or f"http://localhost:{args.port}/"
     state = secrets.token_urlsafe(16)
+
+    # ---- modo manual: já tenho o código, só trocar pelo refresh token ---------------------
+    if args.code:
+        code = args.code.strip()
+        if "code=" in code:  # aceita a URL inteira colada
+            code = urllib.parse.parse_qs(urllib.parse.urlparse(code).query).get("code", [""])[0]
+        code = urllib.parse.unquote(code)
+        if not code:
+            print("ERRO: não achei o código")
+            return 3
+        return trocar_codigo(code, cid, csec, redirect)
+
+    if args.redirect_uri:
+        # fluxo sem servidor local: o usuário aprova, cai na página do redirect e me manda a URL/código
+        url = AUTH_URL + "?" + urllib.parse.urlencode({
+            "client_id": cid, "redirect_uri": redirect, "response_type": "code",
+            "scope": SCOPE, "access_type": "offline", "prompt": "consent",
+        })
+        print("\nAbra, aprove e depois rode:  python scripts/google_oauth.py --redirect-uri", redirect, "--code <URL ou código>\n")
+        print(url)
+        return 0
     url = AUTH_URL + "?" + urllib.parse.urlencode({
         "client_id": cid, "redirect_uri": redirect, "response_type": "code",
         "scope": SCOPE, "access_type": "offline", "prompt": "consent", "state": state,
@@ -140,8 +163,12 @@ def main() -> int:
         print("ERRO: state não confere — refaça o processo")
         return 3
 
+    return trocar_codigo(res["code"], cid, csec, redirect)
+
+
+def trocar_codigo(code: str, cid: str, csec: str, redirect: str) -> int:
     body = urllib.parse.urlencode({
-        "code": res["code"], "client_id": cid, "client_secret": csec,
+        "code": code, "client_id": cid, "client_secret": csec,
         "redirect_uri": redirect, "grant_type": "authorization_code",
     }).encode()
     req = urllib.request.Request(TOKEN_URL, data=body, method="POST",
