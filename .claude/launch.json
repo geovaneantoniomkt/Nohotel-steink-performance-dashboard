@@ -4,8 +4,14 @@
     {
       "name": "dashboard",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "npx --yes wrangler@4.131.1 pages dev public --compatibility-date=2026-09-01 --port 8790 --ip 127.0.0.1"],
+      "runtimeArgs": ["/c", "npx --yes netlify-cli@23 dev --dir public --port 8790 --offline"],
       "port": 8790
+    },
+    {
+      "name": "dashboard-cloudflare",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "npx --yes wrangler@4.131.1 pages dev public --compatibility-date=2026-09-01 --port 8792 --ip 127.0.0.1"],
+      "port": 8792
     }
   ]
 }
