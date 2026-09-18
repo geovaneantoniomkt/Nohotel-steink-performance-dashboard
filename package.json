@@ -9,6 +9,7 @@
     "fetch:meta": "python scripts/fetch_meta.py",
     "fetch:google": "python scripts/fetch_google.py",
     "oauth:google": "python scripts/google_oauth.py",
+    "bundle": "python scripts/bundle_netlify.py",
     "dev": "netlify dev --dir public --port 8790",
     "deploy": "netlify deploy --prod --dir public",
     "dev:cloudflare": "wrangler pages dev public --compatibility-date=2026-09-01 --port 8790",

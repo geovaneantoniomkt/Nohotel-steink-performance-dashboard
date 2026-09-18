@@ -37,11 +37,28 @@ Princípios de segurança:
 
 ## 1. Criar o site no Netlify
 
-1. Entrar no Netlify → **Add new site → Deploy manually** e arrastar a pasta `public/` (qualquer
-   conteúdo serve; é só para o site existir e ganhar um ID). **Não** use "Import from Git".
+Gere primeiro o pacote de deploy:
+
+```bash
+npm run bundle          # cria ./deploy-netlify (~2 MB, 15 arquivos)
+```
+
+1. Entrar no Netlify → **Add new site → Deploy manually** e arrastar a pasta **`deploy-netlify`**.
+   **Não** use "Import from Git".
 2. Renomear o site em **Site configuration → Site details → Change site name** para
    `nohotel-dashboard` (a URL fica `https://nohotel-dashboard.netlify.app`).
 3. Copiar o **Site ID** em *Site configuration → Site details → Site information*.
+
+### Por que uma pasta separada, e não `public/` nem a pasta do projeto
+
+| O que arrastar | O que acontece |
+|---|---|
+| `public/` sozinha | O site sobe **sem a Edge Function**, ou seja, **sem senha**, com os dados do cliente abertos na internet. Nunca faça isso. |
+| A pasta do projeto inteira | Sobe `node_modules` (mais de 1 GB) e os arquivos locais de segredo (`.env`, `.env.google`, `SENHA-LOCAL.txt`). |
+| `deploy-netlify` | Só o `netlify.toml`, a Edge Function de senha e a `public/` com os dados. É o que você quer. |
+
+Se subir antes de cadastrar as variáveis do passo 2, o site responde **503** em todas as rotas — de
+propósito. É seguro: nada é servido sem senha em nenhum momento.
 
 ## 2. Senha do dashboard (variáveis de ambiente do Netlify)
 
@@ -162,7 +179,24 @@ no `.gitignore`.
 | `SENHA-LOCAL.txt` | lembrete da senha local de teste |
 | `public/data/*.json` | dados coletados |
 
-## 9. Alternativa: Cloudflare Pages
+## 9. Se o build falhar com "hugo: command not found"
+
+Significa que o `netlify.toml` não chegou ao Netlify, ou que o comando de build do site (em
+*Site configuration → Build & deploy → Build settings*) está sobrescrevendo o do arquivo. Sem um
+comando explícito, o Netlify tenta adivinhar o framework e, como a pasta publicada se chama
+`public`, ele conclui que é um site Hugo.
+
+O `netlify.toml` do repositório já traz um comando explícito que não faz nada:
+
+```toml
+[build]
+  command = "echo 'Sem etapa de build: public/ ja vem pronto do coletor.'"
+```
+
+Se o erro persistir, apague o campo *Build command* nas configurações do site pela interface, para
+o valor do arquivo voltar a valer.
+
+## 10. Alternativa: Cloudflare Pages
 
 O repositório também traz a mesma proteção em `functions/_middleware.js` (formato Cloudflare Pages
 Functions) e o `wrangler.toml`. O workflow só usa o Cloudflare se os segredos do Netlify não
@@ -170,7 +204,7 @@ existirem. Para usar esse caminho, cadastre `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE
 GitHub e as variáveis `DASHBOARD_PASSWORD` / `SESSION_SECRET` no painel do Cloudflare Pages. Os
 comandos locais ficam em `npm run dev:cloudflare` e `npm run deploy:cloudflare`.
 
-## 10. Checklist de segurança executado
+## 11. Checklist de segurança executado
 
 - [x] `/data/*.json` sem sessão → 401; `/` sem sessão → redireciona para `/login`
 - [x] Senha errada → 401 com atraso; 5 erros → bloqueio de 15 min por IP

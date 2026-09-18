@@ -9,8 +9,11 @@
 
 [build]
   publish = "public"
-  command = ""
   edge_functions = "netlify/edge-functions"
+  # Comando explícito de propósito: não há nada para construir, os arquivos já vêm prontos.
+  # Deixar o comando vazio faz o Netlify tentar adivinhar o framework — e, como a pasta publicada
+  # se chama "public", ele conclui que é um site Hugo e o build quebra com "hugo: command not found".
+  command = "echo 'Sem etapa de build: public/ ja vem pronto do coletor.'"
 
 # A pasta functions/ da raiz é do Cloudflare Pages (formato Workers) e não pode ser lida como
 # Netlify Function. Apontar explicitamente evita que o Netlify tente empacotá-la.
