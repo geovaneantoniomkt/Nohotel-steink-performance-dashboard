@@ -23,15 +23,40 @@ const enc = new TextEncoder();
 // memória por isolate — melhor esforço, igual ao Cloudflare
 const attempts = new Map();
 
+/** Lê a variável tentando todas as fontes; só desiste quando nenhuma tem valor. */
 function envVar(name) {
   try {
-    if (typeof Netlify !== "undefined" && Netlify.env) return Netlify.env.get(name);
+    if (typeof Netlify !== "undefined" && Netlify.env) {
+      const v = Netlify.env.get(name);
+      if (v) return v;
+    }
   } catch { /* ignore */ }
   try {
-    return Deno.env.get(name);
-  } catch {
-    return undefined;
-  }
+    const v = Deno.env.get(name);
+    if (v) return v;
+  } catch { /* ignore */ }
+  try {
+    if (typeof Netlify !== "undefined" && Netlify.env && Netlify.env.toObject) {
+      const v = Netlify.env.toObject()[name];
+      if (v) return v;
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+/** Diagnóstico do 503 — diz o que falta sem revelar nenhum valor. */
+function envDiagnostico(password, secret) {
+  const linhas = [];
+  linhas.push(password ? "DASHBOARD_PASSWORD: encontrada" : "DASHBOARD_PASSWORD: NAO ENCONTRADA");
+  if (!secret) linhas.push("SESSION_SECRET: NAO ENCONTRADA");
+  else if (String(secret).length < 16) linhas.push(`SESSION_SECRET: encontrada, mas com ${String(secret).length} caracteres (precisa de 16 ou mais)`);
+  else linhas.push("SESSION_SECRET: encontrada");
+  let total = null;
+  try {
+    if (typeof Netlify !== "undefined" && Netlify.env && Netlify.env.toObject) total = Object.keys(Netlify.env.toObject()).length;
+  } catch { /* ignore */ }
+  linhas.push(total == null ? "A Edge Function nao consegue enxergar nenhuma variavel de ambiente." : `Variaveis visiveis para a Edge Function: ${total}`);
+  return linhas.join("\n");
 }
 
 /* ------------------------------------------------------------------ crypto */
@@ -196,7 +221,15 @@ export default async function handler(request, context) {
 
   if (!password || !secret || String(secret).length < 16) {
     return withSecurityHeaders(
-      new Response("Dashboard não configurado: defina DASHBOARD_PASSWORD e SESSION_SECRET (>= 16 caracteres) nas variáveis de ambiente do Netlify.", {
+      new Response(
+        [
+          "Dashboard nao configurado.",
+          "",
+          envDiagnostico(password, secret),
+          "",
+          "Cadastre DASHBOARD_PASSWORD e SESSION_SECRET em Site configuration > Environment variables,",
+          "deixe o escopo em 'All scopes', desmarque 'Contains secret values' e publique de novo.",
+        ].join("\n"), {
         status: 503,
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       }),
