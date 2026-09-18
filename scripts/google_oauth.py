@@ -188,7 +188,7 @@ def trocar_codigo(code: str, cid: str, csec: str, redirect: str) -> int:
 
     save_env({"GOOGLE_ADS_REFRESH_TOKEN": rt})
     print("\nRefresh token gerado e salvo em .env.google (fora do git).\n")
-    print("Cadastre nos Secrets do repositório (Settings → Secrets and variables → Actions):")
+    print("Cadastre nos Secrets do repositório (Settings > Secrets and variables > Actions):")
     print(f"  GOOGLE_ADS_REFRESH_TOKEN = {rt}\n")
     print("Agora rode:  python scripts/fetch_google.py")
     return 0
