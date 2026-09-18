@@ -15,7 +15,7 @@
     "deploy:cloudflare": "wrangler pages deploy public --project-name nohotel-dashboard --branch main --commit-dirty=true"
   },
   "devDependencies": {
-    "netlify-cli": "^23.0.0",
+    "netlify-cli": "^23.15.1",
     "wrangler": "^4.0.0"
   }
 }

@@ -21,3 +21,6 @@ SENHA-LOCAL.txt
 
 # Credenciais do Google Ads (uso local)
 .env.google
+
+# Local Netlify folder
+.netlify

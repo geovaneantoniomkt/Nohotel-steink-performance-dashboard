@@ -83,13 +83,44 @@ jobs:
       # não estiver configurado, para o repositório servir aos dois.
 
       - name: Publicar no Netlify
+        id: netlify
         if: ${{ env.NETLIFY_AUTH_TOKEN != '' && env.NETLIFY_SITE_ID != '' }}
-        run: >
-          npx --yes netlify-cli@23 deploy
-          --prod
-          --dir public
-          --site "$NETLIFY_SITE_ID"
-          --message "Atualização automática ${{ github.run_number }}"
+        run: |
+          out=$(npx --yes netlify-cli@23 deploy \
+            --prod \
+            --dir public \
+            --site "$NETLIFY_SITE_ID" \
+            --message "Atualização automática ${{ github.run_number }}" \
+            --json)
+          echo "$out"
+          url=$(python -c "import json,sys; d=json.loads(sys.argv[1]); print(d.get('url') or d.get('deploy_url') or '')" "$out")
+          echo "Publicado em: $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Conferir que o site continua atrás de senha
+        # Rede de segurança contra a pior falha possível: a Edge Function não subir e o
+        # dashboard (com os dados do cliente) ficar aberto na internet.
+        if: ${{ steps.netlify.outputs.url != '' }}
+        run: |
+          url="${{ steps.netlify.outputs.url }}"
+          dados=$(curl -s -o /dev/null -w '%{http_code}' "$url/data/meta.json")
+          raiz=$(curl -s -o /dev/null -w '%{http_code}' "$url/")
+          echo "GET /data/meta.json -> $dados (esperado 401)"
+          echo "GET /               -> $raiz (esperado 303)"
+          falhou=0
+          if [ "$dados" != "401" ]; then
+            echo "::error::Os dados responderam $dados em vez de 401 — o dashboard pode estar aberto sem senha."
+            falhou=1
+          fi
+          if [ "$raiz" != "303" ] && [ "$raiz" != "302" ]; then
+            echo "::error::A raiz respondeu $raiz em vez de redirecionar para /login."
+            falhou=1
+          fi
+          if [ "$falhou" = "1" ]; then
+            echo "Confira DASHBOARD_PASSWORD e SESSION_SECRET nas variáveis de ambiente do Netlify."
+            exit 1
+          fi
+          echo "Proteção por senha confirmada no ar."
 
       - name: Publicar no Cloudflare Pages
         if: ${{ env.NETLIFY_AUTH_TOKEN == '' && env.CLOUDFLARE_API_TOKEN != '' }}
