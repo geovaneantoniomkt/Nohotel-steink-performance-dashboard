@@ -1,0 +1,105 @@
+name: Atualizar dashboard
+
+# Roda todo dia às 07:00 (Brasília) e também manualmente ou quando o código do dashboard muda.
+on:
+  schedule:
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "public/**"
+      - "functions/**"
+      - "scripts/**"
+      - "wrangler.toml"
+      - ".github/workflows/update-dashboard.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard-deploy
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Coletar dados do Meta (Ads + orgânico)
+        env:
+          META_ACCESS_TOKEN: ${{ secrets.META_ADS_TOKEN || secrets.META_ACCESS_TOKEN }}
+          META_AD_ACCOUNT_ID: ${{ vars.META_AD_ACCOUNT_ID || '812845936220210' }}
+          META_PAGE_ID: ${{ vars.META_PAGE_ID || '207987622557413' }}
+          META_IG_USER_ID: ${{ vars.META_IG_USER_ID || '17841402216050279' }}
+          META_API_VERSION: ${{ vars.META_API_VERSION || 'v23.0' }}
+          META_SINCE: ${{ vars.META_SINCE || '2025-04-01' }}
+          OUT_DIR: public/data
+        run: python scripts/fetch_meta.py
+
+      - name: Coletar dados do Google Ads
+        # Sem credenciais o script gera google.json com "configured: false" e o dashboard mostra o passo a passo.
+        continue-on-error: true
+        env:
+          GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+          GOOGLE_ADS_CLIENT_ID: ${{ secrets.GOOGLE_ADS_CLIENT_ID }}
+          GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
+          GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+          GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
+          GOOGLE_ADS_CUSTOMER_ID: ${{ vars.GOOGLE_ADS_CUSTOMER_ID || '781-346-4105' }}
+          GOOGLE_ADS_API_VERSION: ${{ vars.GOOGLE_ADS_API_VERSION || '' }}
+          GOOGLE_SINCE: ${{ vars.GOOGLE_SINCE || '2025-04-01' }}
+          OUT_DIR: public/data
+        run: python scripts/fetch_google.py
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Publicar no Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >
+          npx --yes wrangler@4.131.1 pages deploy public
+          --project-name "${{ vars.CF_PAGES_PROJECT || 'nohotel-dashboard' }}"
+          --branch main
+          --commit-dirty=true
+
+      - name: Resumo
+        if: always()
+        run: |
+          echo "### Dashboard Nohotel" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f public/data/meta.json ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          m = json.load(open("public/data/meta.json", encoding="utf-8"))
+          print(f"- Meta gerado em: {m.get('generated_at')}")
+          print(f"- Campanhas: {len(m.get('campaigns', []))} · Anúncios: {len(m.get('ads', []))} · Linhas diárias: {len(m.get('daily', []))}")
+          for w in m.get("warnings", []):
+              print(f"- ⚠️ Meta: {w}")
+          PY
+          else
+            echo "- Coleta do Meta falhou (meta.json não gerado)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f public/data/google.json ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          g = json.load(open("public/data/google.json", encoding="utf-8"))
+          if g.get("configured"):
+              print(f"- Google Ads gerado em: {g.get('generated_at')} · API {g.get('api_version')} · campanhas: {len(g.get('campaigns', []))} · linhas diárias: {len(g.get('daily', []))}")
+          else:
+              print(f"- Google Ads não configurado: {g.get('reason')}")
+          for w in g.get("warnings", []):
+              print(f"- ⚠️ Google: {w}")
+          PY
+          fi

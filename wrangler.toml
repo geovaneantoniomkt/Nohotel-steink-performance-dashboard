@@ -1,0 +1,9 @@
+name = "nohotel-dashboard"
+compatibility_date = "2026-09-01"
+pages_build_output_dir = "public"
+
+# Variáveis SEM segredo podem ficar aqui. Os segredos (DASHBOARD_PASSWORD, SESSION_SECRET)
+# devem ser cadastrados no painel do Cloudflare Pages > Settings > Environment variables
+# (tipo "Secret") ou via `npx wrangler pages secret put NOME`.
+[vars]
+SESSION_HOURS = "12"

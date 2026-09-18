@@ -1,0 +1,16 @@
+{
+  "name": "nohotel-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dashboard de performance Nohotel (Meta Ads + Google Ads + orgânico) — Steink Performance",
+  "scripts": {
+    "fetch": "python scripts/fetch_meta.py && python scripts/fetch_google.py",
+    "fetch:meta": "python scripts/fetch_meta.py",
+    "fetch:google": "python scripts/fetch_google.py",
+    "dev": "wrangler pages dev public --compatibility-date=2026-09-01 --port 8790",
+    "deploy": "wrangler pages deploy public --project-name nohotel-dashboard --branch main --commit-dirty=true"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

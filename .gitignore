@@ -1,0 +1,23 @@
+# Dados gerados pelo coletor — NUNCA commitar (o repositório pode ser público)
+public/data/*
+!public/data/.gitkeep
+
+# Segredos locais
+.env
+.env.*
+.dev.vars
+*.token
+
+# Ferramentas
+node_modules/
+.wrangler/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# Senha local de teste
+SENHA-LOCAL.txt
+
+# Credenciais do Google Ads (uso local)
+.env.google

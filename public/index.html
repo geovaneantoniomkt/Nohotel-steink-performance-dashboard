@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<title>Nohotel · Dashboard de performance</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="/logo.jpg" alt="Nohotel" width="40" height="40" id="brand-logo">
+      <div>
+        <div class="brand-name" id="brand-name">Nohotel</div>
+        <div class="brand-sub" id="brand-sub">B2C · Steink Performance</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Praça</div>
+      <div class="nav-static" id="brand-market">Regional · Nova Odessa e região</div>
+    </div>
+
+    <nav class="nav-group" aria-label="Seções">
+      <div class="nav-label">Seções</div>
+      <a href="#exec" class="nav-item" data-section="exec"><span class="ico">◉</span>Visão executiva</a>
+      <a href="#meta" class="nav-item" data-section="meta"><span class="ico">◈</span>Meta Ads</a>
+      <a href="#google" class="nav-item" data-section="google"><span class="ico">◇</span>Google Ads</a>
+      <a href="#criativos" class="nav-item" data-section="criativos"><span class="ico">▤</span>Criativos</a>
+      <a href="#organico" class="nav-item" data-section="organico"><span class="ico">◍</span>Orgânico (IG + FB)</a>
+      <a href="#legendas" class="nav-item" data-section="legendas"><span class="ico">≡</span>Legendas</a>
+    </nav>
+
+    <div class="nav-group metas">
+      <div class="nav-label">Metas <button type="button" class="link" id="btn-edit-targets">editar</button></div>
+      <div class="meta-row"><span>Custo por reserva (site)</span><strong id="t-purchase"></strong></div>
+      <div class="meta-row"><span>Custo por conversa</span><strong id="t-conv"></strong></div>
+      <div class="meta-row"><span>Custo por conversão Google</span><strong id="t-gconv"></strong></div>
+      <div class="meta-row sep"><span>Verba Meta / mês</span><strong id="t-budget"></strong></div>
+      <div class="meta-row"><span>Verba Google / mês</span><strong id="t-gbudget"></strong></div>
+      <form id="targets-form" class="targets-form" hidden>
+        <label>Custo por reserva (R$)<input name="cost_per_purchase" type="number" step="0.01" min="0.1"></label>
+        <label>Custo por conversa (R$)<input name="cost_per_conversation" type="number" step="0.01" min="0.1"></label>
+        <label>Custo por conversão Google (R$)<input name="google_cost_per_conversion" type="number" step="0.01" min="0.1"></label>
+        <label>Verba Meta / mês (R$)<input name="meta_monthly" type="number" step="1" min="1"></label>
+        <label>Verba Google / mês (R$)<input name="google_monthly" type="number" step="1" min="0"></label>
+        <label>Frequência máx.<input name="frequency_max" type="number" step="0.1" min="1"></label>
+        <div class="row">
+          <button type="submit" class="btn small">Salvar</button>
+          <button type="button" class="btn small ghost" id="btn-reset-targets">Padrão</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="sidebar-foot">
+      <a href="/logout" class="link">Sair</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1>Dashboard de performance</h1>
+        <div class="topbar-sub" id="topbar-sub">Meta Ads · Google Ads · Orgânico</div>
+      </div>
+      <div class="topbar-meta">
+        <div><span>Período</span><strong id="hdr-period">—</strong></div>
+        <div><span>Comparado com</span><strong id="hdr-compare">—</strong></div>
+        <div><span>Atualizado</span><strong id="hdr-updated">—</strong></div>
+      </div>
+    </header>
+
+    <section class="filters card" aria-label="Filtro de período">
+      <label>Atalho
+        <select id="f-preset">
+          <option value="7">Últimos 7 dias</option>
+          <option value="14">Últimos 14 dias</option>
+          <option value="30">Últimos 30 dias</option>
+          <option value="month">Este mês</option>
+          <option value="lastmonth">Mês passado</option>
+          <option value="90">Últimos 90 dias</option>
+          <option value="max">Desde o início</option>
+          <option value="custom">Personalizado</option>
+        </select>
+      </label>
+      <label>De <input type="date" id="f-since"></label>
+      <label>Até <input type="date" id="f-until"></label>
+      <button class="btn" id="f-apply" type="button">Aplicar</button>
+      <div class="filters-note" id="f-note"></div>
+    </section>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <section id="sec-exec" class="section"></section>
+    <section id="sec-meta" class="section" hidden></section>
+    <section id="sec-google" class="section" hidden></section>
+    <section id="sec-criativos" class="section" hidden></section>
+    <section id="sec-organico" class="section" hidden></section>
+    <section id="sec-legendas" class="section" hidden></section>
+
+    <footer class="foot">
+      Atualizado automaticamente todo dia às 7h (GitHub Actions → Cloudflare Pages). Meta Ads via Marketing API; Google Ads via Google Ads API; orgânico via Graph API (Página + Instagram).
+      Custo por resultado é calculado sobre o gasto da própria campanha. Alcance de períodos personalizados é a soma dos alcances diários (aproximação); os atalhos usam o alcance exato da API.
+    </footer>
+  </main>
+</div>
+<div id="tooltip" class="tooltip" hidden></div>
+<script src="/app.js"></script>
+</body>
+</html>

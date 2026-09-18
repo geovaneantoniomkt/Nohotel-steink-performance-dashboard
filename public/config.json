@@ -1,0 +1,40 @@
+{
+  "client": {
+    "name": "Nohotel",
+    "legal_name": "Hotéis Nohotel",
+    "segment": "Hotéis · Nova Odessa, Americana e região",
+    "market": "Regional · Nova Odessa, Americana, Limeira, Campinas e região (SP)",
+    "agency": "Steink Performance",
+    "logo": "/logo.jpg",
+    "website": ""
+  },
+  "budget": {
+    "meta_monthly": 1000,
+    "google_monthly": 0
+  },
+  "_comentario_metas": "Metas calculadas a partir do histórico da própria conta (abr/2025 a set/2026): mediana de R$ 481 por reserva (melhor mês R$ 253), R$ 153 por carrinho (melhor R$ 85) e R$ 7,50 por conversa no WhatsApp quando essas campanhas rodaram. Ajustáveis no menu lateral do dashboard.",
+  "targets": {
+    "cost_per_purchase": 400,
+    "cost_per_add_to_cart": 120,
+    "cost_per_conversation": 12,
+    "cost_per_profile_visit": 1.5,
+    "google_cost_per_conversion": 60,
+    "cpm_topo_max": 10,
+    "ctr_min": 1.0,
+    "frequency_max": 2.5,
+    "min_spend_for_alert": 30
+  },
+  "meta": {
+    "ad_account_id": "812845936220210",
+    "business_id": "647998705890215",
+    "page_id": "207987622557413",
+    "ig_user_id": "17841402216050279",
+    "pixel_id": "405737827091951"
+  },
+  "instagram": { "username": "hoteisnohotel" },
+  "google_ads": {
+    "enabled": true,
+    "customer_id": "781-346-4105",
+    "note": "Conta Google Ads da Nohotel (781-346-4105). Os dados aparecem quando as credenciais da Google Ads API estiverem cadastradas nos secrets do GitHub."
+  }
+}
