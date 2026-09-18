@@ -145,6 +145,7 @@ const state = {
   config: null, meta: null, google: null, organic: null,
   since: null, until: null, preset: "30", prevSince: null, prevUntil: null,
   targets: {}, section: "exec",
+  histYear: null, // ano mostrado no histórico mensal ("all" = todos)
   creativeFilter: { campaign: "all", quality: "all" },
   googleFilter: { campaign: "all" },
 };
@@ -488,6 +489,12 @@ function tile({ label, value, sub, delta, accent, hero, cls }) {
 function block(title, subtitle, ...children) {
   return h("div", { class: "block" }, h("div", { class: "block-head" }, h("h2", {}, title, subtitle ? h("small", { text: subtitle }) : null)), ...children);
 }
+/** Igual ao block(), mas com um controle (filtro, botão) alinhado à direita do título. */
+function blockWith(title, subtitle, control, ...children) {
+  return h("div", { class: "block" },
+    h("div", { class: "block-head" }, h("h2", {}, title, subtitle ? h("small", { text: subtitle }) : null), control || null),
+    ...children);
+}
 function progressBar(pct, level) {
   const p = h("div", { class: "progress" }); const i = h("i", { class: level || "" }); i.style.width = clamp(pct, 0, 100) + "%"; p.append(i); return p;
 }
@@ -702,27 +709,66 @@ function renderExec() {
   const monthsCap = groupBy((m.daily || []).filter((r) => isCaptacao(r.campaign_id)).map((r) => ({ ...r, month: r.date.slice(0, 7) })), "month");
   const gMonths = gEnabled() ? gGroupBy((state.google.daily || []).map((r) => ({ ...r, month: r.date.slice(0, 7) })), "month") : new Map();
   const monthKeys = Array.from(new Set([...months.keys(), ...gMonths.keys()])).sort();
+  const years = Array.from(new Set(monthKeys.map((k) => k.slice(0, 4)))).sort().reverse();
+  if (state.histYear !== "all" && !years.includes(state.histYear)) state.histYear = years[0] || "all";
+  const showAllYears = state.histYear === "all" || years.length <= 1;
+  const shownKeys = showAllYears ? monthKeys : monthKeys.filter((k) => k.startsWith(state.histYear));
+
+  const yearSelect = years.length > 1
+    ? h("label", { class: "year-filter" }, "Ano",
+      h("select", {
+        "aria-label": "Ano do histórico mensal",
+        onchange: (e) => {
+          state.histYear = e.target.value;
+          renderExec();
+          requestAnimationFrame(() => $$("#sec-exec .chart-card").forEach((c) => c._render && c._render()));
+        },
+      },
+        ...years.map((y) => h("option", { value: y, text: y, selected: state.histYear === y ? "" : null })),
+        h("option", { value: "all", text: "Todos os anos", selected: state.histYear === "all" ? "" : null })))
+    : null;
+
+  /* linha por mês + total do período mostrado */
+  const totals = { spend: 0, meta: 0, google: 0, purchases: 0, capSpend: 0, revenue: 0, carts: 0, conversations: 0, impressions: 0, clicks: 0 };
+  const monthRowsEls = shownKeys.map((k) => {
+    const a = months.get(k) || finish(emptyAgg());
+    const c = monthsCap.get(k) || finish(emptyAgg());
+    const gm = gMonths.get(k) || gFinish(gEmpty());
+    const spend = a.spend + gm.cost;
+    const rev = a.revenue + gm.conversions_value;
+    const impressions = a.impressions + gm.impressions;
+    const clicks = a.clicks + gm.clicks;
+    const partial = k === last.slice(0, 7);
+    totals.spend += spend; totals.meta += a.spend; totals.google += gm.cost;
+    totals.purchases += a.purchases; totals.capSpend += c.spend; totals.revenue += rev;
+    totals.carts += a.add_to_carts; totals.conversations += a.conversations;
+    totals.impressions += impressions; totals.clicks += clicks;
+    return h("tr", { class: partial ? "parcial" : "" },
+      h("td", {}, `${MONTHS[+k.slice(5, 7) - 1]}${showAllYears ? " " + k.slice(0, 4) : ""} `, partial ? h("span", { class: "badge warn", text: "parcial" }) : null),
+      h("td", { text: fmt.brl(spend) }), h("td", { text: fmt.brl(a.spend) }), h("td", { text: gEnabled() ? fmt.brl(gm.cost) : "—" }),
+      h("td", { text: fmt.int(a.purchases) }), h("td", { text: fmt.brl(c.cost_per_purchase) }),
+      h("td", { text: rev > 0 ? fmt.brl(rev) : "—" }), h("td", { text: rev > 0 ? fmt.x(div(rev, spend)) : "—" }),
+      h("td", { text: fmt.int(a.add_to_carts) }), h("td", { text: fmt.int(a.conversations) }),
+      h("td", { text: fmt.int(impressions) }), h("td", { text: fmt.int(clicks) }),
+      h("td", { text: fmt.pct(div(clicks * 100, impressions)) }), h("td", { text: fmt.brl(div(spend, clicks)) }));
+  });
+  const totalRow = shownKeys.length > 1
+    ? h("tr", { class: "total" },
+      h("td", { text: showAllYears ? `Total · ${years.length} anos` : `Total ${state.histYear}` }),
+      h("td", { text: fmt.brl(totals.spend) }), h("td", { text: fmt.brl(totals.meta) }), h("td", { text: gEnabled() ? fmt.brl(totals.google) : "—" }),
+      h("td", { text: fmt.int(totals.purchases) }), h("td", { text: fmt.brl(div(totals.capSpend, totals.purchases)) }),
+      h("td", { text: totals.revenue > 0 ? fmt.brl(totals.revenue) : "—" }), h("td", { text: totals.revenue > 0 ? fmt.x(div(totals.revenue, totals.spend)) : "—" }),
+      h("td", { text: fmt.int(totals.carts) }), h("td", { text: fmt.int(totals.conversations) }),
+      h("td", { text: fmt.int(totals.impressions) }), h("td", { text: fmt.int(totals.clicks) }),
+      h("td", { text: fmt.pct(div(totals.clicks * 100, totals.impressions)) }), h("td", { text: fmt.brl(div(totals.spend, totals.clicks)) }))
+    : null;
+
   const histTable = h("div", { class: "table-wrap" }, h("table", {},
     h("thead", {}, h("tr", {},
       h("th", { text: "Mês" }), h("th", { text: "Investimento" }), h("th", { text: "Meta" }), h("th", { text: "Google" }),
       h("th", { text: "Reservas" }), h("th", { text: "Custo/reserva" }), h("th", { text: "Receita" }), h("th", { text: "ROAS" }),
       h("th", { text: "Carrinhos" }), h("th", { text: "Conversas" }), h("th", { text: "Impressões" }), h("th", { text: "Cliques" }), h("th", { text: "CTR" }), h("th", { text: "CPC" }))),
-    h("tbody", {}, ...monthKeys.map((k) => {
-      const a = months.get(k) || finish(emptyAgg());
-      const c = monthsCap.get(k) || finish(emptyAgg());
-      const gm = gMonths.get(k) || gFinish(gEmpty());
-      const spend = a.spend + gm.cost;
-      const rev = a.revenue + gm.conversions_value;
-      const partial = k === last.slice(0, 7);
-      return h("tr", { class: partial ? "parcial" : "" },
-        h("td", {}, `${MONTHS[+k.slice(5, 7) - 1]} ${k.slice(0, 4)} `, partial ? h("span", { class: "badge warn", text: "parcial" }) : null),
-        h("td", { text: fmt.brl(spend) }), h("td", { text: fmt.brl(a.spend) }), h("td", { text: gEnabled() ? fmt.brl(gm.cost) : "—" }),
-        h("td", { text: fmt.int(a.purchases) }), h("td", { text: fmt.brl(c.cost_per_purchase) }),
-        h("td", { text: rev > 0 ? fmt.brl(rev) : "—" }), h("td", { text: rev > 0 ? fmt.x(div(rev, spend)) : "—" }),
-        h("td", { text: fmt.int(a.add_to_carts) }), h("td", { text: fmt.int(a.conversations) }),
-        h("td", { text: fmt.int(a.impressions + gm.impressions) }), h("td", { text: fmt.int(a.clicks + gm.clicks) }),
-        h("td", { text: fmt.pct(a.ctr) }), h("td", { text: fmt.brl(a.cpc) }));
-    })),
+    h("tbody", {}, ...monthRowsEls, totalRow),
   ));
 
   /* --- onde está o resultado ----------------------------------------------- */
@@ -774,7 +820,7 @@ function renderExec() {
     block("Controle de investimento", "ciclo mensal e distribuição do gasto entre plataformas", invest),
     block("O que está acontecendo", `volume e eficiência · ${fmt.date(state.since)} a ${fmt.date(state.until)}`, kpis, bars),
     block("Como está evoluindo", "dia a dia do período selecionado", charts),
-    block("Histórico mensal", "mês a mês desde o início — independe do filtro de período", histTable,
+    blockWith("Histórico mensal", "mês a mês — independe do filtro de período do topo", yearSelect, histTable,
       h("div", { class: "faint", text: "“Reservas” são as compras registradas pelo pixel do site. Campanhas de topo de funil (tráfego, alcance, engajamento) entram no investimento total, mas não no custo por reserva." })),
     block("Onde está o resultado", "e onde o dinheiro está parado", results),
     block("Qual ação tomar", "alertas priorizados por dinheiro em jogo", actions),
