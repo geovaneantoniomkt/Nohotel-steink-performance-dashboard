@@ -12,13 +12,13 @@
     "meta_monthly": 1000,
     "google_monthly": 0
   },
-  "_comentario_metas": "Metas calculadas a partir do histórico da própria conta (abr/2025 a set/2026): mediana de R$ 481 por reserva (melhor mês R$ 253), R$ 153 por carrinho (melhor R$ 85) e R$ 7,50 por conversa no WhatsApp quando essas campanhas rodaram. Ajustáveis no menu lateral do dashboard.",
+  "_comentario_metas": "Metas calculadas a partir do histórico da própria conta (abr/2025 a set/2026). Meta Ads: mediana de R$ 481 por reserva (melhor mês R$ 253), R$ 153 por carrinho (melhor R$ 85) e R$ 7,50 por conversa no WhatsApp quando essas campanhas rodaram. Google Ads: mediana de R$ 139 por conversão 'Compra no site' (melhor mês R$ 75), gasto médio de R$ 919/mês. Ajustáveis no menu lateral do dashboard.",
   "targets": {
     "cost_per_purchase": 400,
     "cost_per_add_to_cart": 120,
     "cost_per_conversation": 12,
     "cost_per_profile_visit": 1.5,
-    "google_cost_per_conversion": 60,
+    "google_cost_per_conversion": 150,
     "cpm_topo_max": 10,
     "ctr_min": 1.0,
     "frequency_max": 2.5,

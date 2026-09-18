@@ -564,7 +564,11 @@ function renderExec() {
   const gMonthAgg = gAggregate(gRowsIn(monthStart(last), last));
   const monthSpend = monthAgg.spend + gMonthAgg.cost;
   const dayN = +last.slice(8, 10), dim = daysInMonth(last);
-  const budgetMeta = T.meta_monthly || 0, budgetGoogle = gEnabled() ? (T.google_monthly || 0) : 0;
+  const gDailyBudget = gEnabled() ? sum((state.google.campaigns || []).filter((c) => c.status === "ENABLED"), (c) => c.daily_budget || 0) : 0;
+  /* verba do Google não definida → estimada pelos orçamentos diários das campanhas ativas */
+  const googleBudgetEstimated = gEnabled() && !(T.google_monthly > 0);
+  const budgetMeta = T.meta_monthly || 0;
+  const budgetGoogle = !gEnabled() ? 0 : googleBudgetEstimated ? gDailyBudget * dim : T.google_monthly;
   const budget = budgetMeta + budgetGoogle;
   const pace = monthSpend / Math.max(1, dayN);
   const projection = pace * dim;
@@ -574,8 +578,6 @@ function renderExec() {
   const paceLevel = !budget ? "" : projection > budget * 1.15 ? "crit" : projection > budget * 1.05 ? "warn" : "good";
   const dailyBudgetTotal = sum(m.campaigns.filter((c) => c.effective_status === "ACTIVE"), (c) => c.daily_budget || 0)
     + sum(m.adsets.filter((s) => s.effective_status === "ACTIVE" && !(idx.campaigns.get(s.campaign_id)?.daily_budget > 0)), (s) => s.daily_budget || 0);
-  const gDailyBudget = gEnabled() ? sum((state.google.campaigns || []).filter((c) => c.status === "ENABLED"), (c) => c.daily_budget || 0) : 0;
-
   const capLeft = m.account.spend_cap > 0 ? m.account.spend_cap - m.account.amount_spent_lifetime : null;
 
   const invest = h("div", { class: "grid c3" },
@@ -589,7 +591,7 @@ function renderExec() {
       h("div", { class: "split" },
         h("div", { class: "split-row" }, h("span", {}, spanDot(COLOR.meta), "Meta Ads"), progressBar(budgetMeta ? (monthAgg.spend / budgetMeta) * 100 : 0), h("b", { text: fmt.brl(monthAgg.spend) })),
         gEnabled() || budgetGoogle
-          ? h("div", { class: "split-row" }, h("span", {}, spanDot(COLOR.google), "Google Ads"), progressBar(budgetGoogle ? (gMonthAgg.cost / budgetGoogle) * 100 : 0, "google"), h("b", { text: fmt.brl(gMonthAgg.cost) }))
+          ? h("div", { class: "split-row" }, h("span", {}, spanDot(COLOR.google), googleBudgetEstimated ? "Google Ads (verba estimada)" : "Google Ads"), progressBar(budgetGoogle ? (gMonthAgg.cost / budgetGoogle) * 100 : 0, "google"), h("b", { text: fmt.brl(gMonthAgg.cost) }))
           : null,
       ),
     ),
@@ -622,12 +624,18 @@ function renderExec() {
       delta: deltaBadge(totalSpend, prevTotalSpend, { goodWhenUp: false, kind: "brl" }),
       sub: `Meta ${fmt.brl(all.spend)}${gEnabled() ? ` · Google ${fmt.brl(g.cost)}` : ""}`,
     }),
-    tile({
-      label: "Reservas / compras", value: fmt.int(all.purchases), accent: true,
-      delta: deltaBadge(all.purchases, prevAll.purchases),
-      sub: h("span", {}, `${fmt.brl(cap.cost_per_purchase)} cada · meta ${fmt.brl(T.cost_per_purchase)} `,
-        all.purchases > 0 ? badge(assess(cap, DEF.purchase).level, levelWord(assess(cap, DEF.purchase).level)) : null),
-    }),
+    gEnabled()
+      ? tile({
+        label: "Reservas / compras", value: fmt.int(Math.round(all.purchases + g.conversions)), accent: true,
+        delta: deltaBadge(all.purchases + g.conversions, prevAll.purchases + gPrev.conversions),
+        sub: `Meta ${fmt.int(all.purchases)} a ${fmt.brl(cap.cost_per_purchase)} · Google ${fmt.dec1(g.conversions)} a ${fmt.brl(g.cpa)}`,
+      })
+      : tile({
+        label: "Reservas / compras", value: fmt.int(all.purchases), accent: true,
+        delta: deltaBadge(all.purchases, prevAll.purchases),
+        sub: h("span", {}, `${fmt.brl(cap.cost_per_purchase)} cada · meta ${fmt.brl(T.cost_per_purchase)} `,
+          all.purchases > 0 ? badge(assess(cap, DEF.purchase).level, levelWord(assess(cap, DEF.purchase).level)) : null),
+      }),
     totalRevenue > 0
       ? tile({
         label: "Receita atribuída", value: fmt.brl(totalRevenue),
@@ -729,7 +737,7 @@ function renderExec() {
     : null;
 
   /* linha por mês + total do período mostrado */
-  const totals = { spend: 0, meta: 0, google: 0, purchases: 0, capSpend: 0, revenue: 0, carts: 0, conversations: 0, impressions: 0, clicks: 0 };
+  const totals = { spend: 0, meta: 0, google: 0, gconv: 0, purchases: 0, capSpend: 0, revenue: 0, carts: 0, conversations: 0, impressions: 0, clicks: 0 };
   const monthRowsEls = shownKeys.map((k) => {
     const a = months.get(k) || finish(emptyAgg());
     const c = monthsCap.get(k) || finish(emptyAgg());
@@ -739,13 +747,14 @@ function renderExec() {
     const impressions = a.impressions + gm.impressions;
     const clicks = a.clicks + gm.clicks;
     const partial = k === last.slice(0, 7);
-    totals.spend += spend; totals.meta += a.spend; totals.google += gm.cost;
+    totals.spend += spend; totals.meta += a.spend; totals.google += gm.cost; totals.gconv += gm.conversions;
     totals.purchases += a.purchases; totals.capSpend += c.spend; totals.revenue += rev;
     totals.carts += a.add_to_carts; totals.conversations += a.conversations;
     totals.impressions += impressions; totals.clicks += clicks;
     return h("tr", { class: partial ? "parcial" : "" },
       h("td", {}, `${MONTHS[+k.slice(5, 7) - 1]}${showAllYears ? " " + k.slice(0, 4) : ""} `, partial ? h("span", { class: "badge warn", text: "parcial" }) : null),
       h("td", { text: fmt.brl(spend) }), h("td", { text: fmt.brl(a.spend) }), h("td", { text: gEnabled() ? fmt.brl(gm.cost) : "—" }),
+      gEnabled() ? h("td", { text: fmt.dec1(gm.conversions) }) : null,
       h("td", { text: fmt.int(a.purchases) }), h("td", { text: fmt.brl(c.cost_per_purchase) }),
       h("td", { text: rev > 0 ? fmt.brl(rev) : "—" }), h("td", { text: rev > 0 ? fmt.x(div(rev, spend)) : "—" }),
       h("td", { text: fmt.int(a.add_to_carts) }), h("td", { text: fmt.int(a.conversations) }),
@@ -756,6 +765,7 @@ function renderExec() {
     ? h("tr", { class: "total" },
       h("td", { text: showAllYears ? `Total · ${years.length} anos` : `Total ${state.histYear}` }),
       h("td", { text: fmt.brl(totals.spend) }), h("td", { text: fmt.brl(totals.meta) }), h("td", { text: gEnabled() ? fmt.brl(totals.google) : "—" }),
+      gEnabled() ? h("td", { text: fmt.dec1(totals.gconv) }) : null,
       h("td", { text: fmt.int(totals.purchases) }), h("td", { text: fmt.brl(div(totals.capSpend, totals.purchases)) }),
       h("td", { text: totals.revenue > 0 ? fmt.brl(totals.revenue) : "—" }), h("td", { text: totals.revenue > 0 ? fmt.x(div(totals.revenue, totals.spend)) : "—" }),
       h("td", { text: fmt.int(totals.carts) }), h("td", { text: fmt.int(totals.conversations) }),
@@ -766,6 +776,7 @@ function renderExec() {
   const histTable = h("div", { class: "table-wrap" }, h("table", {},
     h("thead", {}, h("tr", {},
       h("th", { text: "Mês" }), h("th", { text: "Investimento" }), h("th", { text: "Meta" }), h("th", { text: "Google" }),
+      gEnabled() ? h("th", { text: "Conv. Google" }) : null,
       h("th", { text: "Reservas" }), h("th", { text: "Custo/reserva" }), h("th", { text: "Receita" }), h("th", { text: "ROAS" }),
       h("th", { text: "Carrinhos" }), h("th", { text: "Conversas" }), h("th", { text: "Impressões" }), h("th", { text: "Cliques" }), h("th", { text: "CTR" }), h("th", { text: "CPC" }))),
     h("tbody", {}, ...monthRowsEls, totalRow),
@@ -1153,7 +1164,8 @@ function renderGoogle() {
   }).filter(Boolean);
 
   /* palavras-chave e termos */
-  const kwRows = (g.keywords || []).slice(0, 25);
+  const comEntrega = (x) => x.cost > 0 || x.clicks > 0 || x.impressions > 0;
+  const kwRows = (g.keywords || []).filter(comEntrega).slice(0, 25);
   const qsLevel = (q) => (!ok(q) ? "" : q >= 7 ? "good" : q >= 5 ? "warn" : "crit");
   const kwTable = kwRows.length ? h("div", { class: "table-wrap" },
     h("div", { class: "group-head" }, h("span", { text: "Palavras-chave" }), h("small", { text: "últimos 30 dias · maiores gastos" })),
@@ -1169,7 +1181,7 @@ function renderGoogle() {
           h("td", { text: fmt.int(a.clicks) }), h("td", { text: fmt.pct(a.ctr) }), h("td", { text: fmt.brl(a.cpc) }), h("td", { text: fmt.brl(a.cost) }));
       }))) ) : null;
 
-  const stRows = (g.search_terms || []).slice(0, 25);
+  const stRows = (g.search_terms || []).filter(comEntrega).slice(0, 25);
   const stTable = stRows.length ? h("div", { class: "table-wrap" },
     h("div", { class: "group-head" }, h("span", { text: "Termos de pesquisa" }), h("small", { text: "últimos 30 dias · o que as pessoas digitaram" })),
     h("table", {}, h("thead", {}, h("tr", {}, h("th", { class: "l", text: "Termo" }), h("th", { text: "Conversões" }), h("th", { text: "Custo/conv." }),
@@ -1185,7 +1197,7 @@ function renderGoogle() {
       }))) ) : null;
 
   /* anúncios, dispositivos e localidades */
-  const adsRows = (g.ads || []).slice(0, 12);
+  const adsRows = (g.ads || []).filter(comEntrega).slice(0, 12);
   const adsCards = adsRows.length ? h("div", { class: "cards" }, ...adsRows.map((ad) => {
     const a = gFinish(gAdd(gEmpty(), ad));
     const as = gAssess(a);
@@ -1448,7 +1460,12 @@ function renderHeader() {
   $("#t-conv").textContent = fmt.brl(state.targets.cost_per_conversation);
   $("#t-gconv").textContent = fmt.brl(state.targets.google_cost_per_conversion);
   $("#t-budget").textContent = fmt.brl(state.targets.meta_monthly);
-  $("#t-gbudget").textContent = state.targets.google_monthly > 0 ? fmt.brl(state.targets.google_monthly) : "a definir";
+  if (state.targets.google_monthly > 0) $("#t-gbudget").textContent = fmt.brl(state.targets.google_monthly);
+  else if (gEnabled()) {
+    const daily = sum((state.google.campaigns || []).filter((c) => c.status === "ENABLED"), (c) => c.daily_budget || 0);
+    $("#t-gbudget").textContent = `≈ ${fmt.brl(daily * 30)}`;
+    $("#t-gbudget").title = "Estimada pelos orçamentos diários das campanhas ativas × 30 dias. Defina o valor real em Metas → editar.";
+  } else $("#t-gbudget").textContent = "a definir";
   const warnings = [
     ...(state.meta.warnings || []).map((w) => `Meta: ${w}`),
     ...(!gEnabled() && state.google?.reason ? [`Google Ads: ${state.google.reason}`] : []),

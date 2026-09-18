@@ -122,13 +122,44 @@ def access_token() -> str:
     return tok
 
 
+def strip_fields(query: str, campos: list[str]) -> str:
+    """Remove campos do SELECT de uma consulta GAQL (o resto da consulta fica igual)."""
+    m = re.match(r"(?is)\s*SELECT\s+(.*?)\s+FROM\s+(.*)$", " ".join(query.split()))
+    if not m:
+        return query
+    lista = [c.strip() for c in m.group(1).split(",")]
+    lista = [c for c in lista if c and c not in set(campos)]
+    if not lista:
+        raise ApiError("todos os campos da consulta foram rejeitados pela API")
+    return f"SELECT {', '.join(lista)} FROM {m.group(2)}"
+
+
 class Client:
     def __init__(self, token: str, version: str):
         self.token = token
         self.version = version
 
     def search(self, query: str, customer_id: str = CUSTOMER_ID, retries: int = 4) -> list[dict]:
-        """googleAds:searchStream — devolve a lista de results concatenada de todos os lotes."""
+        """googleAds:searchStream — devolve a lista de results concatenada de todos os lotes.
+
+        Se a versão da API não reconhecer algum campo do SELECT (o Google aposenta campos a cada
+        versão), o campo é removido e a consulta repetida — o restante dos dados continua vindo.
+        """
+        for _ in range(4):
+            try:
+                return self._search(query, customer_id, retries)
+            except ApiError as e:
+                ruins = re.findall(r"Unrecognized fields? in the query: ([^\n]+)", str(e))
+                if not ruins:
+                    raise
+                campos = re.findall(r"'([A-Za-z0-9_.]+)'", ruins[0])
+                if not campos:
+                    raise
+                warn(f"campo(s) sem suporte na API {self.version}, ignorados: {', '.join(campos)}")
+                query = strip_fields(query, campos)
+        return self._search(query, customer_id, retries)
+
+    def _search(self, query: str, customer_id: str = CUSTOMER_ID, retries: int = 4) -> list[dict]:
         url = f"https://googleads.googleapis.com/{self.version}/customers/{customer_id}/googleAds:searchStream"
         headers = {
             "Authorization": f"Bearer {self.token}",
@@ -317,14 +348,14 @@ def collect(c: Client) -> dict:
     campaigns = []
     for r in c.search("""
         SELECT campaign.id, campaign.name, campaign.status, campaign.serving_status, campaign.advertising_channel_type,
-               campaign.advertising_channel_sub_type, campaign.bidding_strategy_type, campaign.start_date, campaign.end_date,
+               campaign.advertising_channel_sub_type, campaign.bidding_strategy_type,
                campaign_budget.amount_micros, campaign_budget.period
         FROM campaign WHERE campaign.status != 'REMOVED' ORDER BY campaign.id"""):
         cp, bd = r.get("campaign", {}), r.get("campaignBudget", {}) or {}
         campaigns.append({
             "id": str(cp.get("id")), "name": cp.get("name"), "status": cp.get("status"), "serving_status": cp.get("servingStatus"),
             "channel_type": cp.get("advertisingChannelType"), "channel_sub_type": cp.get("advertisingChannelSubType"),
-            "bidding_strategy_type": cp.get("biddingStrategyType"), "start_date": cp.get("startDate"), "end_date": cp.get("endDate"),
+            "bidding_strategy_type": cp.get("biddingStrategyType"), "start_date": cp.get("startDate"), "end_date": cp.get("endDate"),  # podem vir vazios
             "daily_budget": money(bd.get("amountMicros")) if (bd.get("period") in (None, "DAILY")) else 0.0,
             "impression_share": None, "lost_is_budget": None, "lost_is_rank": None,
         })
