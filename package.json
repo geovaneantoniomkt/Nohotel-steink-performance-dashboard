@@ -4,6 +4,7 @@
   "private": true,
   "description": "Dashboard de performance Nohotel (Meta Ads + Google Ads + orgânico) — Steink Performance",
   "scripts": {
+    "test": "node tests/auth.test.mjs",
     "fetch": "python scripts/fetch_meta.py && python scripts/fetch_google.py",
     "fetch:meta": "python scripts/fetch_meta.py",
     "fetch:google": "python scripts/fetch_google.py",

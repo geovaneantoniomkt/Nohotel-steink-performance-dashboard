@@ -4,11 +4,13 @@
 # que intercepta TODAS as rotas — inclusive os JSONs em /data/.
 #
 # Os dados NÃO estão no git: o GitHub Actions roda os coletores e faz o deploy com a CLI do Netlify,
-# levando public/ já preenchido. Por isso o site não deve ser buildado pelo Netlify a partir do repo.
+# levando public/ já preenchido. Por isso o site não deve ser conectado ao repositório pela interface
+# do Netlify — se for, ele publica sem a pasta data/ e o dashboard aparece vazio.
 
 [build]
   publish = "public"
   command = ""
+  edge_functions = "netlify/edge-functions"
 
 # A pasta functions/ da raiz é do Cloudflare Pages (formato Workers) e não pode ser lida como
 # Netlify Function. Apontar explicitamente evita que o Netlify tente empacotá-la.
@@ -18,6 +20,12 @@
 [build.environment]
   NODE_VERSION = "22"
 
-# A rota da Edge Function está declarada no próprio arquivo (export const config).
+# Rota da camada de senha. O arquivo também traz `export const config`, mas a declaração aqui é a
+# que vale e é a mais confiável em deploy manual pela CLI.
+[[edge_functions]]
+  path = "/*"
+  function = "auth"
+
 # Variáveis obrigatórias em Site configuration > Environment variables:
 #   DASHBOARD_PASSWORD, SESSION_SECRET  (e SESSION_HOURS, opcional)
+# Sem elas a Edge Function responde 503 de propósito, em vez de servir o site aberto.

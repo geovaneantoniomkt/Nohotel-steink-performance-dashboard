@@ -73,6 +73,11 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Testar a camada de senha
+        # Se a proteção quebrar, o deploy não sai — melhor ficar com os dados de ontem
+        # do que publicar o dashboard aberto.
+        run: node tests/auth.test.mjs
+
       # ---------------------------------------------------------------- deploy
       # Netlify é o destino principal. O passo do Cloudflare só roda se o Netlify
       # não estiver configurado, para o repositório servir aos dois.
