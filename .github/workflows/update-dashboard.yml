@@ -53,6 +53,13 @@ jobs:
           OUT_DIR: public/data
         run: python scripts/fetch_meta.py
 
+      - name: Baixar imagens do Meta
+        # Os links do fbcdn expiram e nem sempre abrem fora do Facebook; as imagens passam a sair do próprio site.
+        continue-on-error: true
+        env:
+          OUT_DIR: public/data
+        run: python scripts/cache_images.py
+
       - name: Coletar dados do Google Ads
         # Sem credenciais o script gera google.json com "configured: false" e o dashboard mostra o passo a passo.
         continue-on-error: true
