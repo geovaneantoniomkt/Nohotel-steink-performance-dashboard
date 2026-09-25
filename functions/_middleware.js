@@ -267,6 +267,7 @@ export async function onRequest(context) {
   }
 
   const res = await next();
-  const isData = path.startsWith("/data/") || path.endsWith(".json") || path === "/" || path.endsWith(".html");
+  // imagens dos criativos (/data/img/) podem ficar no cache do navegador (revalidam); o resto dos dados, nunca
+  const isData = (path.startsWith("/data/") && !path.startsWith("/data/img/")) || path.endsWith(".json") || path === "/" || path.endsWith(".html");
   return withSecurityHeaders(res, { noStore: isData });
 }

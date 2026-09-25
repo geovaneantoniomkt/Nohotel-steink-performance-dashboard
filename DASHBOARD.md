@@ -1,7 +1,7 @@
 # Configuração do dashboard — Nohotel
 
 ```
-GitHub Actions (todo dia 07:00 BRT)                        Netlify
+GitHub Actions (3x/dia: 06h, 12h, 18h BRT)                 Netlify e/ou Cloudflare Pages
 ┌────────────────────────────────┐  netlify deploy   ┌──────────────────────────────────┐
 │ scripts/fetch_meta.py          │ ────────────────► │ netlify/edge-functions/auth.js   │ ← senha + cabeçalhos
 │   META_ACCESS_TOKEN (secret)   │  public/ + data/  │ public/index.html, app.js        │
@@ -101,9 +101,18 @@ Em **Settings → Secrets and variables → Actions → New repository secret**:
 Variáveis opcionais (aba *Variables*): `META_API_VERSION` (padrão `v23.0`),
 `GOOGLE_ADS_CUSTOMER_ID` (padrão `781-346-4105`), `META_SINCE` / `GOOGLE_SINCE` (padrão `2025-04-01`).
 
-O workflow é `.github/workflows/update-dashboard.yml`. Ele roda todo dia às **10:00 UTC (07:00
+O workflow é `.github/workflows/update-dashboard.yml`. Ele roda **3x por dia (06:17, 12:17 e 18:17
 Brasília)**, manualmente em **Actions → Atualizar dashboard → Run workflow**, e a cada push na `main`
-que altere `public/`, `netlify/` ou `scripts/`.
+que altere `public/`, `netlify/`, `functions/` ou `scripts/`.
+
+Ele publica em **todo destino configurado**: Netlify (com `NETLIFY_AUTH_TOKEN` + `NETLIFY_SITE_ID`) e
+Cloudflare Pages (com `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`). Um endereço cujo destino não
+tem os secrets **não é atualizado** — foi o que deixou o `.netlify.app` parado no deploy manual de
+18/09/2026. Depois de cada deploy, `scripts/check_live.sh` confere que o site continua atrás de senha.
+
+As imagens dos criativos e posts são baixadas por `scripts/cache_images.py` e publicadas em
+`/data/img/` (os links do Meta expiram e nem sempre abrem fora do Facebook). Se a última coleta tiver
+mais de 30 horas, o dashboard mostra uma faixa vermelha de **dados desatualizados**.
 
 Se o Google Ads ainda não estiver configurado, o passo dele falha de forma controlada
 (`continue-on-error`), grava `google.json` com `configured: false` e o dashboard mostra o passo a
@@ -199,8 +208,8 @@ o valor do arquivo voltar a valer.
 ## 10. Alternativa: Cloudflare Pages
 
 O repositório também traz a mesma proteção em `functions/_middleware.js` (formato Cloudflare Pages
-Functions) e o `wrangler.toml`. O workflow só usa o Cloudflare se os segredos do Netlify não
-existirem. Para usar esse caminho, cadastre `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` no
+Functions) e o `wrangler.toml`. O workflow publica no Cloudflare sempre que os segredos dele
+existirem (em paralelo ao Netlify, se este também estiver configurado). Para usar esse caminho, cadastre `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` no
 GitHub e as variáveis `DASHBOARD_PASSWORD` / `SESSION_SECRET` no painel do Cloudflare Pages. Os
 comandos locais ficam em `npm run dev:cloudflare` e `npm run deploy:cloudflare`.
 
