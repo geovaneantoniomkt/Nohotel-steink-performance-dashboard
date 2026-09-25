@@ -1,7 +1,7 @@
 # Nohotel × Steink Performance — Dashboard de performance
 
 Dashboard protegido por senha com os dados de **Meta Ads**, **Google Ads** e **orgânico** (Instagram +
-Facebook) da Nohotel. Atualiza sozinho todo dia às 7h da manhã e publica no **Netlify**.
+Facebook) da Nohotel. Atualiza sozinho 3x por dia (6h, 12h e 18h) e publica no **Cloudflare Pages** (`nohotel-dashboard.pages.dev`) e, se configurado, no **Netlify**.
 
 | Item | Valor |
 |---|---|

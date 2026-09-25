@@ -78,6 +78,9 @@ for (const target of targets) {
   r = await get("/data/meta.json");
   check("GET /data/meta.json sem sessão devolve 401 JSON", r.status === 401 && (r.headers.get("content-type") || "").includes("json"), `status ${r.status}`);
 
+  r = await get("/data/img/abc.jpg");
+  check("imagens dos criativos sem sessão também devolvem 401", r.status === 401, `status ${r.status}`);
+
   r = await get("/criativos");
   check("rota interna sem sessão preserva o destino no next", r.headers.get("location") === "/login?next=%2Fcriativos", r.headers.get("location"));
 
@@ -114,6 +117,10 @@ for (const target of targets) {
 
   r = await get("/data/meta.json", auth);
   check("GET /data/meta.json com sessão passa", r.status === 200, `status ${r.status}`);
+  check("dados com sessão vão com no-store", (r.headers.get("cache-control") || "").includes("no-store"), r.headers.get("cache-control"));
+
+  r = await get("/data/img/abc.jpg", auth);
+  check("imagem com sessão passa e pode ficar em cache (revalida)", r.status === 200 && !(r.headers.get("cache-control") || "").includes("no-store"), r.headers.get("cache-control"));
 
   r = await get("/login", auth);
   check("quem já tem sessão e abre /login vai para /", r.status === 303 && r.headers.get("location") === "/", r.headers.get("location"));

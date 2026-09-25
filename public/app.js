@@ -1053,7 +1053,7 @@ function renderGoogle() {
           h("b", { text: "Google Ads ainda não está conectado ao dashboard" }),
           h("span", { text: reason ? `Motivo da última tentativa: ${reason}` : "O coletor ainda não encontrou credenciais da Google Ads API." }),
           h("span", { class: "faint", text: `${T.google_monthly > 0 ? "Verba prevista: " + fmt.brl(T.google_monthly) + "/mês. " : "Verba mensal ainda não definida (ajustável em Metas, no menu lateral). "}Assim que as credenciais forem cadastradas, esta seção mostra campanhas, grupos de anúncios, palavras-chave, termos de pesquisa, dispositivos e localidades.` }))),
-      block("Como conectar", "uma vez só — depois a atualização é automática todo dia às 7h",
+      block("Como conectar", "uma vez só — depois a atualização é automática 3x por dia",
         h("div", { class: "setup" },
           h("div", { class: "card" },
             h("h3", { text: "1. Na conta administradora (MCC)" }),
@@ -1436,7 +1436,7 @@ function renderLegend() {
         : `Conta ${cfg.google_ads.customer_id} — aguardando credenciais da API. Passo a passo na aba Google Ads.`],
       ["Orgânico", `Graph API: página do Facebook (${cfg.meta.page_id}) e Instagram @${cfg.instagram.username}. Séries dos últimos 30/90 dias; métricas por publicação via Instagram Insights.`],
       ["Pixel", `ID ${cfg.meta.pixel_id}. As reservas e carrinhos vêm dos eventos desse pixel — se ele parar de disparar, o dashboard mostra zero resultado mesmo com vendas acontecendo.`],
-      ["Atualização", "Automática todo dia às 7h (Brasília) via GitHub Actions, com publicação no Cloudflare Pages. Última coleta: " + fmt.dateTime(state.meta.generated_at) + "."],
+      ["Atualização", "Automática 3x por dia (6h, 12h e 18h, Brasília) via GitHub Actions. Última coleta: " + fmt.dateTime(state.meta.generated_at) + "."],
       ["Metas", "Editáveis no menu lateral (ficam salvas apenas neste navegador). Padrão definido em config.json."],
     ]))),
   );
@@ -1471,7 +1471,18 @@ function renderHeader() {
     ...(!gEnabled() && state.google?.reason ? [`Google Ads: ${state.google.reason}`] : []),
   ];
   const banner = $("#banner");
-  if (warnings.length) {
+  /* a coleta roda 3x por dia; passar de 30h sem coleta quer dizer que a atualização parou */
+  const ageH = (Date.now() - new Date(state.meta.generated_at).getTime()) / 36e5;
+  const stale = ok(ageH) && ageH > 30;
+  banner.classList.toggle("error", stale);
+  if (stale) {
+    banner.hidden = false;
+    banner.replaceChildren(
+      h("b", { text: `Dados desatualizados: a última coleta foi em ${fmt.dateTime(state.meta.generated_at)} (há ${Math.floor(ageH / 24) || 1} dia(s)).` }),
+      h("div", { text: "A atualização automática não rodou desde então. Os números abaixo não incluem os dias seguintes." }),
+      warnings.length ? h("ul", {}, ...warnings.slice(0, 6).map((w) => h("li", { text: w }))) : null,
+    );
+  } else if (warnings.length) {
     banner.hidden = false;
     banner.replaceChildren(h("b", { text: "Avisos da última coleta:" }), h("ul", {}, ...warnings.slice(0, 6).map((w) => h("li", { text: w }))));
   } else banner.hidden = true;
