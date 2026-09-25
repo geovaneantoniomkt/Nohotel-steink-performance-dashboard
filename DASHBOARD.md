@@ -114,6 +114,10 @@ As imagens dos criativos e posts são baixadas por `scripts/cache_images.py` e p
 `/data/img/` (os links do Meta expiram e nem sempre abrem fora do Facebook). Se a última coleta tiver
 mais de 30 horas, o dashboard mostra uma faixa vermelha de **dados desatualizados**.
 
+O repositório é público, e o GitHub desliga workflows agendados de repositórios públicos após 60 dias
+sem commits. O passo "Manter o agendamento ativo" reativa o workflow pela API a cada execução para a
+coleta não parar em silêncio.
+
 Se o Google Ads ainda não estiver configurado, o passo dele falha de forma controlada
 (`continue-on-error`), grava `google.json` com `configured: false` e o dashboard mostra o passo a
 passo de integração no lugar dos dados. O resto continua funcionando.

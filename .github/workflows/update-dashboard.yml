@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  actions: write # só para o passo "Manter o agendamento ativo"
 
 concurrency:
   group: dashboard-deploy
@@ -132,6 +133,15 @@ jobs:
           echo "::error::Nenhum destino de deploy configurado."
           echo "Cadastre CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID (ou NETLIFY_AUTH_TOKEN e NETLIFY_SITE_ID) nos secrets."
           exit 1
+
+      - name: Manter o agendamento ativo
+        # Em repositório público o GitHub desliga workflows agendados após 60 dias sem commits,
+        # e o dashboard pararia de atualizar em silêncio. Reativar pela API a cada execução evita isso.
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update-dashboard.yml/enable" && echo "Agendamento confirmado como ativo."
 
       - name: Resumo
         if: always()
